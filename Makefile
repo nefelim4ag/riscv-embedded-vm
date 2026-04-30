@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O2 -g -m32 -Wall
 
 CC_VM = riscv64-linux-gnu-gcc
-VM_CFLAGS = -O0 -march=rv32e -mabi=ilp32e -ffreestanding -nostdlib
+VM_CFLAGS = -O2 -march=rv32e -mabi=ilp32e -ffreestanding -nostdlib -fPIE
 
 all: main.bin example.bin
 
@@ -16,7 +16,7 @@ example.o: example.c
 	$(CC_VM) $(VM_CFLAGS) -c -o $@ $<
 
 example.elf: example.o rv32e.ld
-	$(CC_VM) $(VM_CFLAGS) -T rv32e.ld -Wl,-n -Wl,--oformat=elf32-littleriscv -o  $@ $<
+	$(CC_VM) $(VM_CFLAGS) -T rv32e.ld -static -Wl,--build-id=none -o  $@ $<
 
 example.bin: example.elf
 	riscv64-linux-gnu-objcopy -O binary $< $@

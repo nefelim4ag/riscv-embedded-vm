@@ -14,11 +14,10 @@
 __section("prog")
 int task(int arg, int tskid)
 {
-    int array[10];
-    array[arg] = arg;
+    int array[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     int a = array[arg] + 1 + tskid;
-    while (a)
-        a--;
+    // while (a)
+    //     a--;
     print(a);
     if (a == 0)
         a++;

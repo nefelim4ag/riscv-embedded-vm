@@ -19,7 +19,7 @@ int evm_interpreter(struct evm_context *ctx) {
     // Program counter
     uint8_t *PC = ctx->prog_start;
     uint32_t cycles = 0;
-    for (;cycles < 2048; PC += 4, cycles++) {
+    for (;cycles < 2048; PC+=4, cycles++) {
         const uint32_t *ptr = (uint32_t *) PC;
         const uint8_t opcode = *ptr & 0x7f; // 6 bit
         if (MODE)
@@ -29,8 +29,8 @@ int evm_interpreter(struct evm_context *ctx) {
             uint8_t func3 = (*ptr >> 12) & 0x3;
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t offset = (*ptr >> 20) & 0xffff;
-            if (offset & (1 << 11))
-                offset |= 0xfffff000;
+            if (offset & (1 << 12))
+                offset |= 0xffffe000;
             switch (func3) {
                 case 2: // lw
                     uint32_t *addr = (uint32_t *)(ctx->X[rs1] + offset);
@@ -51,11 +51,13 @@ int evm_interpreter(struct evm_context *ctx) {
             }
         } else if (opcode == 0x13) {
             uint8_t rd = (*ptr >> 7) & 0x1f;
-            uint8_t func3 = (*ptr >> 12) & 0x3;
+            uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t imm = (*ptr >> 20) & 0xffff;
-            if (imm & (1 << 11))
-                imm |= 0xfffff000;
+            if (imm & (1 << 12))
+                imm |= 0xffffe000;
+            uint8_t shamt = imm & 0x1f;
+            int32_t srs1 = ctx->X[rs1];
             switch (func3) {
                 case 0: // addi
                     if (MODE)
@@ -66,10 +68,53 @@ int evm_interpreter(struct evm_context *ctx) {
                     break;
                 case 1: // slli
                     if (MODE)
-                        printf("slli x[%d] = x[%d] << %d\n", rd, rs1, imm & 0x1f);
+                        printf("slli x[%d] = x[%d] << %d\n", rd, rs1, shamt);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
-                    ctx->X[rd] = ctx->X[rs1] << (imm & 0x1f);
+                    ctx->X[rd] = ctx->X[rs1] << shamt;
+                    break;
+                case 2: // slti
+                    if (MODE)
+                        printf("slti x[%d] = x[%d] <s sext(%d)\n", rd, rs1, imm);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    int32_t i_imm = imm;
+                    ctx->X[rd] = srs1 < i_imm;
+                    break;
+                case 3: // sltiu
+                    if (MODE)
+                        printf("sltiu x[%d] = x[%d] <u sext(%d)\n", rd, rs1, imm);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] < imm;
+                    break;
+                case 4: // xori
+                    if (MODE)
+                        printf("xori x[%d] = x[%d] ^ sext(%d)\n", rd, rs1, imm);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] ^ imm;
+                    break;
+                case 5: // srli srai
+                    if (((imm >> 30) & 1) == 0) {
+                        if (MODE)
+                            printf("srli x[%d] = x[%d] >> %d\n", rd, rs1, shamt);
+                        if (MODE == EVM_MODE_DISASM)
+                            continue;
+                        ctx->X[rd] = ctx->X[rs1] >> shamt;
+                    } else {
+                        if (MODE)
+                            printf("srai x[%d] = x[%d] >>s %d\n", rd, rs1, shamt);
+                        if (MODE == EVM_MODE_DISASM)
+                            continue;
+                        ctx->X[rd] = srs1 >> shamt;
+                    }
+                case 6: // ori
+                    if (MODE)
+                        printf("ori x[%d] = x[%d] | sext(%d)\n", rd, rs1, imm);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] | imm;
                     break;
                 case 7: // andi
                     if (MODE)
@@ -83,8 +128,17 @@ int evm_interpreter(struct evm_context *ctx) {
                         printf("opcode 0x%02x, func3: %d - not implemented\n", opcode, func3);
                     return -1;
             }
+        } else if (opcode == 0x17) {
+            uint8_t rd = (*ptr >> 7) & 0x1f;
+            int32_t imm = *ptr & 0xffffff000;
+            // AUIPC
+            if (MODE)
+                printf("auipc x[%d] = pc + sext(%d)\n", rd, imm);
+            if (MODE == EVM_MODE_DISASM)
+                continue;
+            ctx->X[rd] = (uint32_t) (PC + imm);
         } else if (opcode == 0x23) {
-            uint8_t func3 = (*ptr >> 12) & 0x3;
+            uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint8_t rs2 = (*ptr >> 20) & 0x1f;
             uint32_t offset = ((*ptr >> 7) & 0x1f) | ((*ptr >> 25) << 5) ;
@@ -131,20 +185,91 @@ int evm_interpreter(struct evm_context *ctx) {
             }
         } else if (opcode == 0x33) {
             uint8_t rd = (*ptr >> 7) & 0x1f;
-            uint8_t func3 = (*ptr >> 12) & 0x3;
+            uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t rs2 = (*ptr >> 20) & 0x1f;
-            switch (func3) {
-                case 0: // add
+            uint8_t func7 = (*ptr >> 25);
+            uint16_t func = (func7 << 3) | func3;
+            int32_t srs1 = ctx->X[rs1];
+            int32_t srs2 = ctx->X[rs2];
+            switch (func) {
+                case 0x000:
+                    // add
                     if (MODE)
                         printf("add x[%d] = x[%d] + x[%d]\n", rd, rs1, rs2);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] + ctx->X[rs2];
                     break;
+                case 0x001:
+                    // sll
+                    if (MODE)
+                        printf("sll x[%d] = x[%d] << x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] << (ctx->X[rs2] & 0x1f);
+                case 0x002:
+                    // slt
+                    if (MODE)
+                        printf("slt x[%d] = bool(x[%d] <s x[%d])\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = srs1 < srs2;
+                    break;
+                case 0x003:
+                    // sltu
+                    if (MODE)
+                        printf("sltu x[%d] = bool(x[%d] <u x[%d])\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] < ctx->X[rs2];
+                    break;
+                case 0x004:
+                    // xor
+                    if (MODE)
+                        printf("xor x[%d] = x[%d] ^ x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] ^ ctx->X[rs2];
+                case 0x005:
+                    // slr
+                    if (MODE)
+                        printf("slr x[%d] = x[%d] >> x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] >> (ctx->X[rs2] & 0x1f);
+                case 0x006:
+                    // or
+                    if (MODE)
+                        printf("or x[%d] = x[%d] | x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] | ctx->X[rs2];
+                case 0x007:
+                    // and
+                    if (MODE)
+                        printf("and x[%d] = x[%d] & x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] & ctx->X[rs2];
+                case 0x105:
+                    // sra
+                    if (MODE)
+                        printf("slr x[%d] = x[%d] >>s x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = srs1 >> (ctx->X[rs2] & 0x1f);
+                case 0x180:
+                    // sub
+                    if (MODE)
+                        printf("sub x[%d] = x[%d] - x[%d]\n", rd, rs1, rs2);
+                    if (MODE == EVM_MODE_DISASM)
+                        continue;
+                    ctx->X[rd] = ctx->X[rs1] - ctx->X[rs2];
+                    break;
                 default:
                     if (MODE)
-                        printf("opcode 0x%02x, func3: %d - not implemented\n", opcode, func3);
+                        printf("opcode 0x%02x, func3: %d func7: %d - not implemented\n", opcode, func3, func7);
                     return -1;
             }
         } else if (opcode == 0x63) {
@@ -173,7 +298,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     }
                     printf("%d == %d\n", ctx->X[rs1], ctx->X[rs2]);
                     if (ctx->X[rs1] == ctx->X[rs2])
-                        PC += offset;
+                        PC += offset - 4;
                     break;
                 case 1: // bne
                     if (MODE)
@@ -185,7 +310,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     }
                     printf("%d != %d\n", ctx->X[rs1], ctx->X[rs2]);
                     if (ctx->X[rs1] != ctx->X[rs2])
-                        PC += offset;
+                        PC += offset - 4;
                     break;
                 case 4: // blt
                     if (MODE)
@@ -194,7 +319,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (srs1 < srs2)
-                        PC += offset;
+                        PC += offset - 4;
                     break;
                 case 5: // bge
                     if (MODE)
@@ -203,7 +328,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (srs1 >= srs2)
-                        PC += offset;
+                        PC += offset - 4;
                     break;
                 case 6: // bltu
                     if (MODE)
@@ -212,7 +337,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (urs1 < urs2)
-                        PC += offset;
+                        PC += offset - 4;
                     break;
                 case 7: // bgeu
                     if (MODE)
@@ -221,7 +346,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (urs1 >= urs2)
-                        PC += offset;
+                        PC += offset - 4;
                     break;
             }
         } else if (opcode == 0x67) {
@@ -256,9 +381,9 @@ int evm_interpreter(struct evm_context *ctx) {
                 printf("jal x[%d] = pc+4; pc += sext(%d)\n", rd, offset);
             if (MODE == EVM_MODE_DISASM)
                 continue;
-            if (rd)
+            if (rd) // x0 is readonly, and always zero, it is a special case
                 ctx->X[rd] = (uint32_t)(PC + 4);
-            PC += offset;
+            PC += offset - 4;
             continue;
         } else if (opcode == 0x73) {
             uint32_t *a0 = &ctx->X[10];
