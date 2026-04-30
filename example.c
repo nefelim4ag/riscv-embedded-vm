@@ -5,6 +5,7 @@
 // This file may be distributed under the terms of the GNU GPLv3 license.
 
 // #include <stdint.h>
+#include <stdint.h>
 #include "example.h"
 
 #define dummy() (RISC_V_EVM_CALL_N(1))
@@ -14,7 +15,7 @@
 __section("prog")
 int task(int arg, int tskid)
 {
-    int array[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    uint8_t array[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
     int a = array[arg] + 1 + tskid;
     // while (a)
     //     a--;

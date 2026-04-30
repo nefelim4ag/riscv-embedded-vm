@@ -15,6 +15,7 @@ struct evm_context {
     uint8_t mode;
 };
 
+void evm_print(const char *fmt, ...);
 int evm_interpreter(struct evm_context *ctx);
 
 // Platform helpers

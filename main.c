@@ -4,8 +4,8 @@
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
 
-#include <elf.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +17,13 @@
 static void usage(const char *prog) {
     fprintf(stderr, "Usage: %s <name>.bin\n", prog);
     exit(1);
+}
+
+void evm_print(const char *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    va_end(ap);
 }
 
 void
@@ -78,7 +85,7 @@ int main(int argc, char *argv[]) {
         .mode = EVM_MODE_INT_DEBUG,
         .prog_start = base,
         .prog_size = size,
-        .X[10] = 8,
+        .X[10] = 1,
     };
 
     int ret = evm_interpreter(&prog);
