@@ -85,14 +85,14 @@ int main(int argc, char *argv[]) {
         .mode = EVM_MODE_INT_DEBUG,
         .prog_start = base,
         .prog_size = size,
-        .X[10] = 1,
     };
 
-    int ret = evm_interpreter(&prog);
+    uint32_t arg = 0;
+    int ret = evm_interpreter(&prog, &arg);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }
-    printf("Execution result: %d\n", prog.X[10]);
+    printf("Execution result: %d\n", arg);
 
     munmap(base, size);
     return 0;
