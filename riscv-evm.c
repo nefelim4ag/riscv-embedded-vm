@@ -4,7 +4,6 @@
 //
 // This file may be distributed under the terms of the GNU GPLv3 license.
 
-#include <stdio.h>
 #include <stdint.h>
 #include "riscv-evm.h"
 
@@ -18,8 +17,7 @@ int evm_interpreter(struct evm_context *ctx) {
     ctx->X[2] = (uint32_t) &ctx->stack[sizeof(ctx->stack)]; // stack pointer
     // Program counter
     uint8_t *PC = ctx->prog_start;
-    uint32_t cycles = 0;
-    for (;cycles < 2048; PC+=4, cycles++) {
+    for (;; PC+=4) {
         const uint32_t *ptr = (uint32_t *) PC;
         const uint8_t opcode = *ptr & 0x7f; // 6 bit
         if (MODE)
@@ -167,10 +165,6 @@ int evm_interpreter(struct evm_context *ctx) {
                         continue;
                     ctx->X[rd] = ctx->X[rs1] & imm;
                     break;
-                default:
-                    if (MODE)
-                        evm_print("opcode 0x%02x, func3: %d - not implemented\n", opcode, func3);
-                    return -1;
             }
         } else if (opcode == 0x17) {
             uint8_t rd = (*ptr >> 7) & 0x1f;
@@ -301,10 +295,6 @@ int evm_interpreter(struct evm_context *ctx) {
                         continue;
                     ctx->X[rd] = ctx->X[rs1] - ctx->X[rs2];
                     break;
-                default:
-                    if (MODE)
-                        evm_print("opcode 0x%02x, func3: %d func7: %d - not implemented\n", opcode, func3, func7);
-                    return -1;
             }
         } else if (opcode == 0x37) {
             // lui
@@ -333,32 +323,26 @@ int evm_interpreter(struct evm_context *ctx) {
             switch (func3) {
                 case 0: // beq
                     if (MODE)
-                        evm_print("beq if (x[%d] == x[%d]) pc += sext(%d)) // ",
-                            rs1, rs2, offset);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
+                        evm_print("beq if (x[%d] == x[%d]) pc += sext(%d)) // %d == %d\n",
+                            rs1, rs2, offset, ctx->X[rs1], ctx->X[rs2]);
+                    if (MODE == EVM_MODE_DISASM)
                         continue;
-                    }
-                    evm_print("%d == %d\n", ctx->X[rs1], ctx->X[rs2]);
                     if (ctx->X[rs1] == ctx->X[rs2])
                         PC += offset - 4;
                     break;
                 case 1: // bne
                     if (MODE)
-                        evm_print("bne if (x[%d] != x[%d]) pc += sext(%d)) // ",
-                            rs1, rs2, offset);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
+                        evm_print("bne if (x[%d] != x[%d]) pc += sext(%d)) // %d != %d\n",
+                            rs1, rs2, offset, ctx->X[rs1], ctx->X[rs2]);
+                    if (MODE == EVM_MODE_DISASM)
                         continue;
-                    }
-                    evm_print("%d != %d\n", ctx->X[rs1], ctx->X[rs2]);
                     if (ctx->X[rs1] != ctx->X[rs2])
                         PC += offset - 4;
                     break;
                 case 4: // blt
                     if (MODE)
-                        evm_print("blt if (x[%d] < x[%d]) pc += sext(%d))\n",
-                            rs1, rs2, offset);
+                        evm_print("blt if (x[%d] < x[%d]) pc += sext(%d)) // %d < %d\n",
+                            rs1, rs2, offset, srs1, srs2);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (srs1 < srs2)
@@ -366,8 +350,8 @@ int evm_interpreter(struct evm_context *ctx) {
                     break;
                 case 5: // bge
                     if (MODE)
-                        evm_print("bge if (x[%d] >= x[%d]) pc += sext(%d))\n",
-                            rs1, rs2, offset);
+                        evm_print("bge if (x[%d] >= x[%d]) pc += sext(%d)) // %d >= %d\n",
+                            rs1, rs2, offset, srs1, srs2);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (srs1 >= srs2)
@@ -375,8 +359,8 @@ int evm_interpreter(struct evm_context *ctx) {
                     break;
                 case 6: // bltu
                     if (MODE)
-                        evm_print("bltu if (x[%d] < x[%d]) pc += sext(%d))\n",
-                            rs1, rs2, offset);
+                        evm_print("bltu if (x[%d] < x[%d]) pc += sext(%d)) // %d < %d\n",
+                            rs1, rs2, offset, urs1, urs2);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (urs1 < urs2)
@@ -384,34 +368,25 @@ int evm_interpreter(struct evm_context *ctx) {
                     break;
                 case 7: // bgeu
                     if (MODE)
-                        evm_print("bltu if (x[%d] >= x[%d]) pc += sext(%d))\n",
-                            rs1, rs2, offset);
+                        evm_print("bgeu if (x[%d] >= x[%d]) pc += sext(%d)) // %d >= %d\n",
+                            rs1, rs2, offset, urs1, urs2);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     if (urs1 >= urs2)
                         PC += offset - 4;
                     break;
             }
-        } else if (opcode == 0x67) {
+        } else if (opcode == 0x67) { // jalr
             // uint8_t rd = (*ptr >> 7) & 0x1f;
-            uint8_t func3 = (*ptr >> 12) & 0x3;
+            // uint8_t func3 = (*ptr >> 12) & 0x3;
             // uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            // uint32_t rs2 = (*ptr >> 20) & 0x1f;
             // uint32_t offset = (*ptr >> 20) & 0xffff;
             // if (offset & (1 << 11))
-            //     offset |= 0xfffff000;
-            switch (func3) {
-                case 0: // jalr
-                    if (MODE)
-                        evm_print("jalr // return \n");
-                    return 0;
-                default:
-                    if (MODE)
-                        evm_print("opcode 0x%02x, func3: %d - not implemented\n", opcode, func3);
-                    return -1;
-            }
-        } else if (opcode == 0x6f) {
-            // JAL
+            //     offset |= 0xfffff800;
+            if (MODE)
+                evm_print("jalr // return \n");
+            goto out;
+        } else if (opcode == 0x6f) { // JAL
             uint8_t rd = (*ptr >> 7) & 0x1f;
             uint32_t offset =
                 (((*ptr >> 31) & 0x1)  << 20) |  // imm[20]
@@ -427,7 +402,6 @@ int evm_interpreter(struct evm_context *ctx) {
             if (rd) // x0 is readonly, and always zero, it is a special case
                 ctx->X[rd] = (uint32_t)(PC + 4);
             PC += offset - 4;
-            continue;
         } else if (opcode == 0x73) {
             uint32_t *a0 = &ctx->X[10];
             uint32_t a1 = ctx->X[11];
@@ -447,5 +421,6 @@ int evm_interpreter(struct evm_context *ctx) {
             return -1;
         }
     }
+out:
     return 0;
 }
