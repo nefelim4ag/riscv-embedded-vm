@@ -151,6 +151,7 @@ int evm_interpreter(struct evm_context *ctx) {
                             continue;
                         ctx->X[rd] = srs1 >> shamt;
                     }
+                    continue;
                 case 6: // ori
                     if (MODE)
                         evm_print("ori x[%d] = x[%d] | sext(%d)\n", rd, rs1, imm);
@@ -236,6 +237,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] << (ctx->X[rs2] & 0x1f);
+                    break;
                 case 0x002:
                     // slt
                     if (MODE)
@@ -259,6 +261,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] ^ ctx->X[rs2];
+                    break;
                 case 0x005:
                     // slr
                     if (MODE)
@@ -266,6 +269,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] >> (ctx->X[rs2] & 0x1f);
+                    break;
                 case 0x006:
                     // or
                     if (MODE)
@@ -273,6 +277,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] | ctx->X[rs2];
+                    break;
                 case 0x007:
                     // and
                     if (MODE)
@@ -280,6 +285,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = ctx->X[rs1] & ctx->X[rs2];
+                    break;
                 case 0x105:
                     // sra
                     if (MODE)
@@ -287,6 +293,7 @@ int evm_interpreter(struct evm_context *ctx) {
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     ctx->X[rd] = srs1 >> (ctx->X[rs2] & 0x1f);
+                    break;
                 case 0x180:
                     // sub
                     if (MODE)

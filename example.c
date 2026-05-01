@@ -25,10 +25,12 @@ int task(int arg, int tskid)
     print(a);
     if (a <= 1)
         a++;
+    a = a ^ 0xffff0000;
     print(a);
     int b = dummy();
     print(b);
     print(a);
     a = sum(a, b);
+    a = a ^ 0xffff0000;
     return a;
 }
