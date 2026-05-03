@@ -81,14 +81,8 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    struct evm_context prog = {
-        .mode = EVM_MODE_INT_DEBUG,
-        .prog_start = base,
-        .prog_size = size,
-    };
-
-    uint32_t arg = 0;
-    int ret = evm_interpreter(&prog, &arg);
+    int32_t arg = 1;
+    int ret = evm_interpreter(base, &arg, EVM_MODE_INT_DEBUG);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }

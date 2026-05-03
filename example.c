@@ -13,10 +13,10 @@
 #define print(a) (RISC_V_EVM_CALL_N1(3, a))
 
 __section("prog")
-int task(int arg, int tskid)
+int task(int arg)
 {
     uint8_t array[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    int a = array[arg] + 1 + tskid;
+    int a = array[arg] + 1;
     // while (a)
     //     a--;
     print(a);

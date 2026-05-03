@@ -7,14 +7,8 @@
 #define EVM_MODE_INT_DEBUG 1
 #define EVM_MODE_DISASM 2
 
-struct evm_context {
-    uint8_t *prog_start;
-    uint32_t prog_size;
-    uint8_t mode;
-};
-
 void evm_print(const char *fmt, ...);
-int evm_interpreter(struct evm_context *ctx, uint32_t *a0);
+int evm_interpreter(uint8_t *prog_start, uint32_t *a0, uint8_t mode);
 
 // Platform helpers
 void
