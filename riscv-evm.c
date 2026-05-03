@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "riscv-evm.h"
 
-int evm_interpreter(uint8_t *prog_start, uint8_t mode, uint32_t *a0, uint32_t a1) {
+int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
     const uint8_t MODE = mode;
     if (MODE == EVM_MODE_DISASM)
         evm_print("Run disassembler\n");
@@ -17,8 +17,11 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, uint32_t *a0, uint32_t a1
     uint8_t stack[256];
     X[0] = 0; // always
     X[2] = (uint32_t) &stack[sizeof(stack)]; // stack pointer
-    X[10] = *a0;
-    X[11] = a1;
+    X[10] = args->a0;
+    X[11] = args->a1;
+    X[12] = args->a2;
+    X[13] = args->a3;
+    X[14] = args->a4;
     // Program counter
     uint8_t *PC = prog_start;
     for (;; PC+=4) {
@@ -107,7 +110,7 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, uint32_t *a0, uint32_t a1
             switch (func3) {
                 case 0: // addi
                     if (MODE)
-                        evm_print("addi x[%d] = x[%d] + sext(%d)\n", rd, rs1, (int32_t)imm);
+                        evm_print("addi x[%d] = x[%d] (0x%08x) + sext(%d)\n", rd, rs1, X[rs1], (int32_t)imm);
                     if (MODE == EVM_MODE_DISASM)
                         continue;
                     X[rd] = X[rs1] + imm;
@@ -433,6 +436,10 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, uint32_t *a0, uint32_t a1
         }
     }
 out:
-    *a0 = X[10];
+    args->a0 = X[10];
+    args->a1 = X[11];
+    args->a2 = X[12];
+    args->a3 = X[13];
+    args->a4 = X[14];
     return 0;
 }

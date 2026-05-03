@@ -37,7 +37,12 @@ platform_ecall(uint32_t id, uint32_t *a0, uint32_t a1,
             break;
         // sum(a, b)
         case 2:
-            ret = *a0 + a1;
+            uint8_t *data = (uint8_t *) a2;
+            printf("oid: %d len: %d ", *a0, a1);
+            for (int i = 0; i < a1; i++) {
+                printf("0x%02x ", data[i]);
+            }
+            printf("\n");
             break;
         case 3:
             printf("print %d\n", *a0);
@@ -81,13 +86,18 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    uint32_t arg = 1;
-    uint32_t arg2 = 0;
-    int ret = evm_interpreter(base, EVM_MODE_INT_DEBUG, &arg, arg2);
+    uint32_t array[] = {0, 3};
+    uint32_t arg = (uint32_t) array;
+    uint8_t arg2[] = {0x00, 0x12, 0x34 };
+    struct evm_args args = {
+        .a0 = (uint32_t) array,
+        .a1 = (uint32_t) arg2,
+    };
+    int ret = evm_interpreter(base, EVM_MODE_INT_DEBUG, &args);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }
-    printf("Execution result: %d\n", arg);
+    printf("Execution result: %d\n", args.a0);
 
     munmap(base, size);
     return 0;

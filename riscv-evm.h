@@ -8,8 +8,12 @@
 #define EVM_MODE_DISASM 2
 
 void evm_print(const char *fmt, ...);
-int evm_interpreter(uint8_t *prog_start, uint8_t mode,
-                    uint32_t *a0, uint32_t a1);
+
+struct evm_args {
+    uint32_t a0, a1, a2, a3, a4;
+};
+
+int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args);
 
 // Platform helpers
 void
