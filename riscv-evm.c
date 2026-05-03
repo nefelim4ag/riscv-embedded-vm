@@ -27,7 +27,7 @@ int evm_interpreter(struct evm_context *ctx, uint32_t *a0) {
             evm_print("%4x | ", PC - ctx->prog_start);
         if (opcode == 0x03) {
             uint8_t rd = (*ptr >> 7) & 0x1f;
-            uint8_t func3 = (*ptr >> 12) & 0x3;
+            uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t offset = (*ptr >> 20) & 0xffff;
             if (offset & (1 << 11))
@@ -388,7 +388,7 @@ int evm_interpreter(struct evm_context *ctx, uint32_t *a0) {
             }
         } else if (opcode == 0x67) { // jalr
             // uint8_t rd = (*ptr >> 7) & 0x1f;
-            // uint8_t func3 = (*ptr >> 12) & 0x3;
+            // uint8_t func3 = (*ptr >> 12) & 0x7;
             // uint8_t rs1 = (*ptr >> 15) & 0x1f;
             // uint32_t offset = (*ptr >> 20) & 0xffff;
             // if (offset & (1 << 11))
