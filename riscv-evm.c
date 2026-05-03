@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include "riscv-evm.h"
 
-int evm_interpreter(uint8_t *prog_start, uint32_t *a0, uint8_t mode) {
+int evm_interpreter(uint8_t *prog_start, uint8_t mode, uint32_t *a0, uint32_t a1) {
     const uint8_t MODE = mode;
     if (MODE == EVM_MODE_DISASM)
         evm_print("Run disassembler\n");
@@ -18,6 +18,7 @@ int evm_interpreter(uint8_t *prog_start, uint32_t *a0, uint8_t mode) {
     X[0] = 0; // always
     X[2] = (uint32_t) &stack[sizeof(stack)]; // stack pointer
     X[10] = *a0;
+    X[11] = a1;
     // Program counter
     uint8_t *PC = prog_start;
     for (;; PC+=4) {

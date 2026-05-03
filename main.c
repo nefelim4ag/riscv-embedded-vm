@@ -81,8 +81,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    int32_t arg = 1;
-    int ret = evm_interpreter(base, &arg, EVM_MODE_INT_DEBUG);
+    uint32_t arg = 1;
+    uint32_t arg2 = 0;
+    int ret = evm_interpreter(base, EVM_MODE_INT_DEBUG, &arg, arg2);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }
