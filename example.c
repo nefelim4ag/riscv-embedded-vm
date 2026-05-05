@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include "example.h"
 
-// #define dummy() (RISC_V_EVM_CALL_N(1))
+#define dummy() (RISC_V_EVM_CALL_N(1))
 // #define sum(a, b) (RISC_V_EVM_CALL_N2(2, a, b))
 // #define print(a) (RISC_V_EVM_CALL_N1(3, a))
 
@@ -24,5 +24,6 @@ void task(uint32_t *args, uint8_t *data)
 {
     uint8_t oid = args[0];
     uint8_t data_len = args[1];
+    data_len += dummy();
     sendf(oid, data_len, data);
 }

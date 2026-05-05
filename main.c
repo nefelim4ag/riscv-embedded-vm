@@ -27,9 +27,14 @@ void evm_print(const char *fmt, ...) {
 }
 
 void
-platform_ecall(uint32_t id, uint32_t *a0, uint32_t a1,
-               uint32_t a2, uint32_t a3, uint32_t a4) {
-    uint32_t ret = *a0;
+platform_ecall(uint32_t *regs) {
+    uint16_t id = regs[0];
+    uint32_t ret = 0;
+    uint32_t a1 = regs[1];
+    uint32_t a2 = regs[2];
+    uint32_t a3 = regs[3];
+    uint32_t a4 = regs[4];
+    uint32_t a5 = regs[5];
     switch (id) {
         // dummy()
         case 1:
@@ -37,21 +42,21 @@ platform_ecall(uint32_t id, uint32_t *a0, uint32_t a1,
             break;
         // sum(a, b)
         case 2:
-            uint8_t *data = (uint8_t *) a2;
-            printf("oid: %d len: %d ", *a0, a1);
-            for (int i = 0; i < a1; i++) {
+            uint8_t *data = (uint8_t *) a3;
+            printf("oid: %d len: %d ", a1, a2);
+            for (int i = 0; i < a2; i++) {
                 printf("0x%02x ", data[i]);
             }
             printf("\n");
             break;
         case 3:
-            printf("print %d\n", *a0);
+            printf("print %d\n", a1);
             return;
         default:
             printf("unknown id\n");
             break;
     }
-    *a0 = ret;
+    regs[0] = ret;
 }
 
 int main(int argc, char *argv[]) {

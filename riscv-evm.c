@@ -417,18 +417,12 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
                 X[rd] = (uint32_t)(PC + 4);
             PC += offset - 4;
         } else if (opcode == 0x73) {
-            uint32_t *a0 = &X[10];
-            uint32_t a1 = X[11];
-            uint32_t a2 = X[12];
-            uint32_t a3 = X[13];
-            uint32_t a4 = X[14];
-            uint32_t a5 = X[15];
             if (MODE)
-                evm_print("ecall args a5: 0x%x, a 0:%x 1:%x 2:%x 3:%x 4:%x\n",
-                       a5, *a0, a1, a2, a3, a4);
+                evm_print("ecall a0 %x, a1 %x, a2 %x, a3 %x, a4 %x, a5 %x\n",
+                          X[10], X[11], X[12], X[13], X[14], X[15]);
             if (MODE == EVM_MODE_DISASM)
                 continue;
-            platform_ecall(a5, a0, a1, a2, a3, a4);
+            platform_ecall(&X[10]);
         } else {
             if (MODE)
                 evm_print("opcode 0x%02x - not implemented\n", opcode);

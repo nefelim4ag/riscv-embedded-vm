@@ -17,7 +17,6 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args);
 
 // Platform helpers
 void
-platform_ecall(uint32_t id, uint32_t *a0, uint32_t a1,
-               uint32_t a2, uint32_t a3, uint32_t a4);
+platform_ecall(uint32_t *regs);
 
 #endif // RISCV_EVM
