@@ -7,7 +7,10 @@
 #include <stdint.h>
 #include "riscv-evm.h"
 
-int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
+int
+evm_interpreter(uint8_t *prog_start, uint16_t size,
+                uint8_t mode, struct evm_args *args)
+{
     const uint8_t MODE = mode;
     if (MODE == EVM_MODE_DISASM)
         evm_print("Run disassembler\n");
@@ -24,87 +27,52 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
     X[14] = args->a4;
     // Program counter
     uint8_t *PC = prog_start;
-    for (;; PC+=4) {
+    uint8_t *end = prog_start + size;
+    X[1] = (uint32_t) end; // the end
+    for (;PC < end; PC+=4) {
         const uint32_t *ptr = (uint32_t *) PC;
         const uint8_t opcode = *ptr & 0x7f; // 6 bit
         if (MODE)
-            evm_print("%4x | ", PC - prog_start);
+            evm_print("%4x (0x%02x) | ", PC - prog_start, opcode);
         if (opcode == 0x03) {
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            uint32_t offset = (*ptr >> 20) & 0xffff;
-            if (offset & (1 << 11))
-                offset |= 0xfffff800;
-            int8_t    *s8 = (int8_t *)   (X[rs1] + offset);
-            int16_t  *s16 = (int16_t *)  (X[rs1] + offset);
-            int32_t  *s32 = (int32_t *)  (X[rs1] + offset);
-            uint8_t   *u8 = (uint8_t *)  (X[rs1] + offset);
-            uint16_t *u16 = (uint16_t *) (X[rs1] + offset);
-            switch (func3) {
-                case 0: // lb
-                    if (MODE)
-                        evm_print("lb x[%d] = M[x[%d] + %d] // = %p", rd, rs1, offset, s8);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
-                        continue;
-                    }
-                    X[rd] = *s8;
-                    if (MODE)
-                        evm_print(" %d\n", X[rd]);
-                    break;
-                case 1: // lh
-                    if (MODE)
-                        evm_print("lh x[%d] = M[x[%d] + %d] // = %p", rd, rs1, offset, s16);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
-                        continue;
-                    }
-                    X[rd] = *s16;
-                    if (MODE)
-                        evm_print(" %d\n", X[rd]);
-                    break;
-                case 2: // lw
-                    if (MODE)
-                        evm_print("lw x[%d] = M[x[%d] + %d] // = %p", rd, rs1, offset, s32);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
-                        continue;
-                    }
-                    X[rd] = *s32;
-                    if (MODE)
-                        evm_print(" %d\n", X[rd]);
-                    break;
-                case 4: // lbu
-                    if (MODE)
-                        evm_print("lbu x[%d] = M[x[%d] + %d] // = %p", rd, rs1, offset, u8);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
-                        continue;
-                    }
-                    X[rd] = *u8;
-                    if (MODE)
-                        evm_print(" %d\n", X[rd]);
-                    break;
-                case 5: // lhu
-                    if (MODE)
-                        evm_print("lbu x[%d] = M[x[%d] + %d] // = %p", rd, rs1, offset, u16);
-                    if (MODE == EVM_MODE_DISASM) {
-                        evm_print("\n");
-                        continue;
-                    }
-                    X[rd] = *u16;
-                    if (MODE)
-                        evm_print(" %d\n", X[rd]);
-                    break;
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint32_t offset = (*ptr >> 20) & 0xfff;
+            if (offset & 0x800)
+                offset |= 0xfffff000;
+            uint8_t *mem = (uint8_t *)(X[rs1] + offset);
+            uint8_t width = 1 << (func3 & 0x3); // 1, 2, 4 bytes
+            uint8_t is_signed = !(func3 & 0x4);
+
+            if (MODE) {
+                static const char *names[] = {"lb","lh","lw","?","lbu","lhu"};
+                evm_print("%s x[%d] = M[x[%d] + %d] // = %p", names[func3],
+                    rd, rs1, offset, mem);
             }
+            if (MODE == EVM_MODE_DISASM) {
+                evm_print("\n");
+                continue;
+            }
+
+            uint32_t val = 0;
+            for (int i = 0; i < width; i++)
+                val |= (uint32_t)mem[i] << (i * 8);
+
+            uint32_t sign_bit = 1u << (width * 8 - 1);
+            if (is_signed && val & sign_bit)
+                val |= ~(sign_bit - 1);
+
+            X[rd] = val;
+            if (MODE)
+                evm_print(" %d\n", X[rd]);
         } else if (opcode == 0x13) {
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            uint32_t imm = (*ptr >> 20) & 0xffff;
-            if (imm & (1 << 11))
-                imm |= 0xfffff800;
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint32_t imm = (*ptr >> 20) & 0xfff;
+            if (imm & 0x800)
+                imm |= 0xfffff000;
             uint8_t shamt = imm & 0x1f;
             int32_t srs1 = X[rs1];
             switch (func3) {
@@ -175,7 +143,7 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
                     break;
             }
         } else if (opcode == 0x17) {
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             int32_t imm = *ptr & 0xffffff000;
             // AUIPC
             if (MODE)
@@ -185,45 +153,29 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
             X[rd] = (uint32_t) (PC + imm);
         } else if (opcode == 0x23) {
             uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            uint8_t rs2 = (*ptr >> 20) & 0x1f;
-            uint32_t offset = ((*ptr >> 7) & 0x1f) | ((*ptr >> 25) << 5) ;
-            if (offset & (1 << 11))
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint8_t rs2 = (*ptr >> 20) & 0xf;
+            uint32_t offset =
+                ((*ptr >> 7) & 0x1f) |
+                (((*ptr >> 25) & 0x7f) << 5);
+            if (offset & 0x800)
                 offset |= 0xfffff000;
-            uint8_t *byte = (uint8_t *) (X[rs1] + offset);
-            uint16_t *hword = (uint16_t *) (X[rs1] + offset);
-            uint32_t *word = (uint32_t *) (X[rs1] + offset);
-            switch (func3) {
-                case 0: // sh
-                    if (MODE)
-                        evm_print("sb M[x[%d] + sext(%d)] = x[%d][7:0] // * (u8 *) %p = %d\n",
-                            rs1, offset, rs2, byte, X[rs2]);
-                    if (MODE == EVM_MODE_DISASM)
-                        continue;
-                    *byte = X[rs2];
-                    break;
-                case 1: // sh
-                    if (MODE)
-                        evm_print("sh M[x[%d] + sext(%d)] = x[%d][15:0] // * (u16 *) %p = %d\n",
-                            rs1, offset, rs2, hword, X[rs2]);
-                    if (MODE == EVM_MODE_DISASM)
-                        continue;
-                    *hword = X[rs2];
-                    break;
-                case 2: // sw
-                    if (MODE)
-                        evm_print("sw M[x[%d] + sext(%d)] = x[%d][31:0] // * (u32 *) %p = %d\n",
-                            rs1, offset, rs2, word, X[rs2]);
-                    if (MODE == EVM_MODE_DISASM)
-                        continue;
-                    *word = X[rs2];
-                    break;
+            uint8_t *mem = (uint8_t *)(X[rs1] + offset);
+            uint8_t width = 1 << (func3 & 0x3); // 1, 2, 4 bytes
+            if (MODE) {
+                static const char *names[] = {"sb","sh","sw"};
+                evm_print("%s M[x[%d] + sext(%d)] = x[%d][%d:0] // * (u8 *) %p = %d\n",
+                    names[func3], rs1, offset, rs2, width * 8 -1, mem, X[rs2]);
             }
+            if (MODE == EVM_MODE_DISASM)
+                continue;
+            for (int i = 0; i < width; i++)
+                mem[i] = X[rs2] >> (i * 8);
         } else if (opcode == 0x33) {
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            uint32_t rs2 = (*ptr >> 20) & 0x1f;
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint32_t rs2 = (*ptr >> 20) & 0xf;
             uint8_t func7 = (*ptr >> 25);
             uint16_t func = (func7 << 3) | func3;
             int32_t srs1 = X[rs1];
@@ -301,7 +253,7 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
                         continue;
                     X[rd] = srs1 >> (X[rs2] & 0x1f);
                     break;
-                case 0x180:
+                case 0x100:
                     // sub
                     if (MODE)
                         evm_print("sub x[%d] = x[%d] - x[%d]\n", rd, rs1, rs2);
@@ -312,7 +264,7 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
             }
         } else if (opcode == 0x37) {
             // lui
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             int32_t imm = *ptr & 0xffffff000;
             if (MODE)
                 evm_print("lui x[%d] = sext(%d)\n", rd, imm);
@@ -321,15 +273,15 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
             X[rd] = imm;
         } else if (opcode == 0x63) {
             uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            uint8_t rs2 = (*ptr >> 20) & 0x1f;
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint8_t rs2 = (*ptr >> 20) & 0xf;
             uint32_t offset =
                 (((*ptr >> 31) & 0x1)  << 12) |  // imm[12]
                 (((*ptr >> 25) & 0x3f) << 5)  |  // imm[10:5]
                 (((*ptr >>  8) & 0xf)  << 1)  |  // imm[4:1]
                 (((*ptr >>  7) & 0x1)  << 11);   // imm[11]
-            if (offset & (1 << 11))
-                offset |= 0xfffff800;
+            if (offset & 0x800)
+                offset |= 0xfffff000;
             uint32_t urs1 = X[rs1];
             uint32_t urs2 = X[rs2];
             int32_t srs1 = X[rs1];
@@ -391,17 +343,22 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
                     break;
             }
         } else if (opcode == 0x67) { // jalr
-            // uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             // uint8_t func3 = (*ptr >> 12) & 0x7;
-            // uint8_t rs1 = (*ptr >> 15) & 0x1f;
-            // uint32_t offset = (*ptr >> 20) & 0xffff;
-            // if (offset & (1 << 11))
-            //     offset |= 0xfffff800;
+            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint32_t offset = (*ptr >> 20) & 0xfff;
+            if (offset & 0x800)
+                offset |= 0xfffff000;
             if (MODE)
-                evm_print("jalr // return \n");
-            goto out;
+                evm_print("jalr t=pc+4; pc=(x[%d]+sext(%d))&∼1; x[%d]=t\n", rs1, offset, rd);
+            if (MODE == EVM_MODE_DISASM)
+                continue;
+            uint32_t t = (uint32_t) PC + 4;
+            PC = (uint8_t *) ((X[rs1] + offset - 4) & ~1);
+            if (rd)
+                X[rd] = t;
         } else if (opcode == 0x6f) { // JAL
-            uint8_t rd = (*ptr >> 7) & 0x1f;
+            uint8_t rd = (*ptr >> 7) & 0xf;
             uint32_t offset =
                 (((*ptr >> 31) & 0x1)  << 20) |  // imm[20]
                 (((*ptr >> 21) & 0x3ff)<< 1)  |  // imm[10:1]
@@ -429,7 +386,6 @@ int evm_interpreter(uint8_t *prog_start, uint8_t mode, struct evm_args *args) {
             return -1;
         }
     }
-out:
     args->a0 = X[10];
     args->a1 = X[11];
     args->a2 = X[12];

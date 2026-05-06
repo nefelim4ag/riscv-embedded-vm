@@ -16,7 +16,7 @@ example.o: example.c
 	$(CC_VM) $(VM_CFLAGS) -c -o $@ $<
 
 example.elf: example.o rv32e.ld
-	$(CC_VM) $(VM_CFLAGS) -T rv32e.ld -static -Wl,--build-id=none -o  $@ $<
+	$(CC_VM) $(VM_CFLAGS) -T rv32e.ld -static -Wl,--build-id=none -o $@ $<
 
 example.bin: example.elf
 	riscv64-linux-gnu-objcopy -O binary $< $@

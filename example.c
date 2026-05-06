@@ -19,11 +19,17 @@ sendf(uint8_t oid, uint8_t rlen, uint8_t *rdata) {
     _sendf(oid, rlen, rdata);
 }
 
-__section("prog")
-void task(uint32_t *args, uint8_t *data)
+__attribute__((noinline)) int sum1(int a, int b) {
+    return a + b;
+}
+
+__attribute__((noinline)) int sum(int a, int b) {
+    uint32_t s = sum1(a, b);
+    return a + b + s;
+}
+
+__section(".start")
+int task(uint32_t *args)
 {
-    uint8_t oid = args[0];
-    uint8_t data_len = args[1];
-    data_len += dummy();
-    sendf(oid, data_len, data);
+    return sum(args[0], args[1]);
 }

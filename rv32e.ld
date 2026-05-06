@@ -1,12 +1,10 @@
-ENTRY(task)
-
 PHDRS {
     text PT_LOAD;
 }
 
 SECTIONS {
     . = 0xffffffff; /* MUST be non zero to trigger PIE */
-    .text : { *(.prog) *(.text*) } :text
+    .text : { *(.start) *(.text*) } :text
     .data : { *(.data*) }
     .bss  : { *(.bss*)  }
     /DISCARD/ : {

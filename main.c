@@ -98,7 +98,7 @@ int main(int argc, char *argv[]) {
         .a0 = (uint32_t) array,
         .a1 = (uint32_t) arg2,
     };
-    int ret = evm_interpreter(base, EVM_MODE_INT_DEBUG, &args);
+    int ret = evm_interpreter(base, size, EVM_MODE_INT_DEBUG, &args);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }
