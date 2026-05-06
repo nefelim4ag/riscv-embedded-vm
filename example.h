@@ -2,69 +2,49 @@
 #define RISC_V_EVM
 
 // Syscalls
-#define RISC_V_EVM_CALL_N(N) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
-           :                     \
-           : "memory");          \
-       _a0; })
+#define _c_ecall(N) ".word ((" #N ") << 20) | 0x73"
 
-#define RISC_V_EVM_CALL_N1(N, A1) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
-       register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
-           : "r"(_a1)            \
-           : "memory");          \
-       _a0; })
+#define RISC_V_EVM_CALL_N1(N, A0) ( \
+    { register unsigned int _a0 __asm__("a0") = (unsigned int)(A0); \
+        __asm__ volatile (_c_ecall(N) : "+r"(_a0) : : "memory"); \
+      _a0; })
 
-#define RISC_V_EVM_CALL_N2(N, A1, A2) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
+#define RISC_V_EVM_CALL_N(N) RISC_V_EVM_CALL_N1(N, 0)
+
+#define RISC_V_EVM_CALL_N2(N, A0, A1) ( \
+    { register unsigned int _a0 __asm__("a0") = (unsigned int)(A0); \
+      register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
+        __asm__ volatile (_c_ecall(N) : "+r"(_a0) : "r"(_a1) : "memory"); \
+      _a0; })
+
+#define RISC_V_EVM_CALL_N3(N, A0, A1, A2) \
+    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(A0); \
        register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
        register unsigned int _a2 __asm__("a2") = (unsigned int)(A2); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
-           : "r"(_a1), "r"(_a2)  \
-           : "memory");          \
+         __asm__ volatile (_c_ecall(N) : "+r"(_a0) : "r"(_a1), "r"(_a2) \
+           : "memory"); \
        _a0; })
 
-#define RISC_V_EVM_CALL_N3(N, A1, A2, A3) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
+#define RISC_V_EVM_CALL_N4(N, A0, A1, A2, A3) \
+    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(A0); \
        register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
        register unsigned int _a2 __asm__("a2") = (unsigned int)(A2); \
        register unsigned int _a3 __asm__("a3") = (unsigned int)(A3); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
+         __asm__ volatile (_c_ecall(N) : "+r"(_a0) \
            : "r"(_a1), "r"(_a2), "r"(_a3) \
-           : "memory");          \
+           : "memory"); \
        _a0; })
 
-#define RISC_V_EVM_CALL_N4(N, A1, A2, A3, A4) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
+#define RISC_V_EVM_CALL_N5(N, A0, A1, A2, A3, A4) \
+    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(A0); \
        register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
        register unsigned int _a2 __asm__("a2") = (unsigned int)(A2); \
        register unsigned int _a3 __asm__("a3") = (unsigned int)(A3); \
        register unsigned int _a4 __asm__("a4") = (unsigned int)(A4); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
+       __asm__ volatile (_c_ecall(N) : "+r"(_a0) \
            : "r"(_a1), "r"(_a2), "r"(_a3), "r"(_a4) \
-           : "memory");          \
+           : "memory"); \
        _a0; })
-
-#define RISC_V_EVM_CALL_N5(N, A1, A2, A3, A4, A5) \
-    ({ register unsigned int _a0 __asm__("a0") = (unsigned int)(N); \
-       register unsigned int _a1 __asm__("a1") = (unsigned int)(A1); \
-       register unsigned int _a2 __asm__("a2") = (unsigned int)(A2); \
-       register unsigned int _a3 __asm__("a3") = (unsigned int)(A3); \
-       register unsigned int _a4 __asm__("a4") = (unsigned int)(A4); \
-       register unsigned int _a5 __asm__("a5") = (unsigned int)(A5); \
-       __asm__ volatile ("ecall" \
-           : "+r"(_a0)           \
-           : "r"(_a1), "r"(_a2), "r"(_a3), "r"(_a4), "r"(_a5) \
-           : "memory");          \
-       _a0; })
-
 
 #ifndef __section
 #define __section(NAME) \

@@ -18,6 +18,6 @@ int evm_interpreter(uint8_t *prog_start, uint16_t size,
 
 // Platform helpers
 void
-platform_ecall(uint32_t *regs);
+platform_ecall(uint16_t id, uint32_t *regs);
 
 #endif // RISCV_EVM

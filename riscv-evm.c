@@ -15,7 +15,7 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
     if (MODE == EVM_MODE_DISASM)
         evm_print("Run disassembler\n");
     if (MODE == EVM_MODE_INT_DEBUG)
-        evm_print("Run interrupt debug mode\n");
+        evm_print("Run interpreter debug mode\n");
     uint32_t X[16];
     uint8_t stack[256];
     X[0] = 0; // always
@@ -374,12 +374,13 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
                 X[rd] = (uint32_t)(PC + 4);
             PC += offset - 4;
         } else if (opcode == 0x73) {
+            uint16_t id = *ptr >> 20;
             if (MODE)
-                evm_print("ecall a0 %x, a1 %x, a2 %x, a3 %x, a4 %x, a5 %x\n",
-                          X[10], X[11], X[12], X[13], X[14], X[15]);
+                evm_print("ecall id: %d a0 %x, a1 %x, a2 %x, a3 %x, a4 %x\n",
+                          id, X[10], X[11], X[12], X[13], X[14]);
             if (MODE == EVM_MODE_DISASM)
                 continue;
-            platform_ecall(&X[10]);
+            platform_ecall(id, &X[10]);
         } else {
             if (MODE)
                 evm_print("opcode 0x%02x - not implemented\n", opcode);
