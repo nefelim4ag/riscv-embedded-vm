@@ -39,7 +39,7 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
             uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0xf;
             uint32_t offset = (*ptr >> 20) & 0xfff;
-            if (offset & 0x800)
+            if (*ptr & 0x80000000)
                 offset |= 0xfffff000;
             uint8_t *mem = (uint8_t *)(X[rs1] + offset);
             uint8_t width = 1 << (func3 & 0x3); // 1, 2, 4 bytes
@@ -71,7 +71,7 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
             uint8_t func3 = (*ptr >> 12) & 0x7;
             uint8_t rs1 = (*ptr >> 15) & 0xf;
             uint32_t imm = (*ptr >> 20) & 0xfff;
-            if (imm & 0x800)
+            if (*ptr & 0x80000000)
                 imm |= 0xfffff000;
             uint8_t shamt = imm & 0x1f;
             int32_t srs1 = X[rs1];
@@ -158,7 +158,7 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
             uint32_t offset =
                 ((*ptr >> 7) & 0x1f) |
                 (((*ptr >> 25) & 0x7f) << 5);
-            if (offset & 0x800)
+            if (*ptr & 0x80000000)
                 offset |= 0xfffff000;
             uint8_t *mem = (uint8_t *)(X[rs1] + offset);
             uint8_t width = 1 << (func3 & 0x3); // 1, 2, 4 bytes
@@ -276,12 +276,11 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
             uint8_t rs1 = (*ptr >> 15) & 0xf;
             uint8_t rs2 = (*ptr >> 20) & 0xf;
             uint32_t offset =
-                (((*ptr >> 31) & 0x1)  << 12) |  // imm[12]
                 (((*ptr >> 25) & 0x3f) << 5)  |  // imm[10:5]
                 (((*ptr >>  8) & 0xf)  << 1)  |  // imm[4:1]
                 (((*ptr >>  7) & 0x1)  << 11);   // imm[11]
-            if (offset & 0x800)
-                offset |= 0xfffff000;
+            if (*ptr & 0x80000000)
+                offset |= 0xfffff800;
             uint32_t urs1 = X[rs1];
             uint32_t urs2 = X[rs2];
             int32_t srs1 = X[rs1];
@@ -360,12 +359,11 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
         } else if (opcode == 0x6f) { // JAL
             uint8_t rd = (*ptr >> 7) & 0xf;
             uint32_t offset =
-                (((*ptr >> 31) & 0x1)  << 20) |  // imm[20]
                 (((*ptr >> 21) & 0x3ff)<< 1)  |  // imm[10:1]
                 (((*ptr >> 20) & 0x1)  << 11) |  // imm[11]
                 (((*ptr >> 12) & 0xff) << 12);   // imm[19:12]
-            if (offset & (1 << 20))
-                offset |= 0xffe00000;
+            if (*ptr & 0x80000000)
+                offset |= 0xfff00000;
             if (MODE)
                 evm_print("jal x[%d] = pc+4; pc += sext(%d)\n", rd, offset);
             if (MODE == EVM_MODE_DISASM)
