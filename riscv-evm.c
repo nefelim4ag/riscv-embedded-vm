@@ -8,7 +8,7 @@
 #include "riscv-evm.h"
 
 int
-evm_interpreter(uint8_t *prog_start, uint16_t size,
+evm_interpreter(uint8_t *prog_start, uint8_t *end,
                 uint8_t mode, struct evm_args *args)
 {
     const uint8_t MODE = mode;
@@ -19,6 +19,7 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
     uint32_t X[16];
     uint8_t stack[256];
     X[0] = 0; // always
+    X[1] = (uint32_t) end; // dummy return point
     X[2] = (uint32_t) &stack[sizeof(stack)]; // stack pointer
     X[10] = args->a0;
     X[11] = args->a1;
@@ -27,8 +28,6 @@ evm_interpreter(uint8_t *prog_start, uint16_t size,
     X[14] = args->a4;
     // Program counter
     uint8_t *PC = prog_start;
-    uint8_t *end = prog_start + size;
-    X[1] = (uint32_t) end; // the end
     for (;PC < end; PC+=4) {
         const uint32_t *ptr = (uint32_t *) PC;
         const uint8_t opcode = *ptr & 0x7f; // 6 bit
