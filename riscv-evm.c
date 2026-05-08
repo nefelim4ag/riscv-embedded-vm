@@ -33,10 +33,11 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
         const uint8_t opcode = *ptr & 0x7f; // 6 bit
         if (MODE)
             evm_print("%4x (0x%02x) | ", PC - prog_start, opcode);
+        // Required almost always
+        uint8_t rd = (*ptr >> 7) & 0x1f;
+        uint8_t func3 = (*ptr >> 12) & 0x7;
         if (opcode == 0x03) {
-            uint8_t rd = (*ptr >> 7) & 0xf;
-            uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t offset = (*ptr >> 20) & 0xfff;
             if (*ptr & 0x80000000)
                 offset |= 0xfffff000;
@@ -66,9 +67,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
             if (MODE)
                 evm_print(" %d\n", X[rd]);
         } else if (opcode == 0x13) {
-            uint8_t rd = (*ptr >> 7) & 0xf;
-            uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t imm = (*ptr >> 20) & 0xfff;
             if (*ptr & 0x80000000)
                 imm |= 0xfffff000;
@@ -142,7 +141,6 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                     break;
             }
         } else if (opcode == 0x17) {
-            uint8_t rd = (*ptr >> 7) & 0xf;
             int32_t imm = *ptr & 0xffffff000;
             // AUIPC
             if (MODE)
@@ -151,9 +149,8 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                 continue;
             X[rd] = (uint32_t) (PC + imm);
         } else if (opcode == 0x23) {
-            uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
-            uint8_t rs2 = (*ptr >> 20) & 0xf;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
+            uint8_t rs2 = (*ptr >> 20) & 0x1f;
             uint32_t offset =
                 ((*ptr >> 7) & 0x1f) |
                 (((*ptr >> 25) & 0x7f) << 5);
@@ -171,16 +168,21 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
             for (int i = 0; i < width; i++)
                 mem[i] = X[rs2] >> (i * 8);
         } else if (opcode == 0x33) {
-            uint8_t rd = (*ptr >> 7) & 0xf;
-            uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
-            uint32_t rs2 = (*ptr >> 20) & 0xf;
-            uint8_t func7 = (*ptr >> 25);
-            uint16_t func = (func7 << 3) | func3;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
+            uint32_t rs2 = (*ptr >> 20) & 0x1f;
             int32_t srs1 = X[rs1];
             int32_t srs2 = X[rs2];
-            switch (func) {
-                case 0x000:
+            switch (func3) {
+                case 0:
+                    if (*ptr & 0x40000000) {
+                        // sub
+                        if (MODE)
+                            evm_print("sub x[%d] = x[%d] - x[%d]\n", rd, rs1, rs2);
+                        if (MODE == EVM_MODE_DISASM)
+                            continue;
+                        X[rd] = X[rs1] - X[rs2];
+                        continue;
+                    }
                     // add
                     if (MODE)
                         evm_print("add x[%d] = x[%d] + x[%d]\n", rd, rs1, rs2);
@@ -188,7 +190,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] + X[rs2];
                     break;
-                case 0x001:
+                case 1:
                     // sll
                     if (MODE)
                         evm_print("sll x[%d] = x[%d] << x[%d]\n", rd, rs1, rs2);
@@ -196,7 +198,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] << (X[rs2] & 0x1f);
                     break;
-                case 0x002:
+                case 2:
                     // slt
                     if (MODE)
                         evm_print("slt x[%d] = bool(x[%d] <s x[%d])\n", rd, rs1, rs2);
@@ -204,7 +206,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = srs1 < srs2;
                     break;
-                case 0x003:
+                case 3:
                     // sltu
                     if (MODE)
                         evm_print("sltu x[%d] = bool(x[%d] <u x[%d])\n", rd, rs1, rs2);
@@ -212,7 +214,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] < X[rs2];
                     break;
-                case 0x004:
+                case 4:
                     // xor
                     if (MODE)
                         evm_print("xor x[%d] = x[%d] ^ x[%d]\n", rd, rs1, rs2);
@@ -220,7 +222,16 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] ^ X[rs2];
                     break;
-                case 0x005:
+                case 5:
+                    if (*ptr & 0x40000000) {
+                        // sra
+                        if (MODE)
+                            evm_print("slr x[%d] = x[%d] >>s x[%d]\n", rd, rs1, rs2);
+                        if (MODE == EVM_MODE_DISASM)
+                            continue;
+                        X[rd] = srs1 >> (X[rs2] & 0x1f);
+                        continue;
+                    }
                     // slr
                     if (MODE)
                         evm_print("slr x[%d] = x[%d] >> x[%d]\n", rd, rs1, rs2);
@@ -228,7 +239,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] >> (X[rs2] & 0x1f);
                     break;
-                case 0x006:
+                case 6:
                     // or
                     if (MODE)
                         evm_print("or x[%d] = x[%d] | x[%d]\n", rd, rs1, rs2);
@@ -236,7 +247,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] | X[rs2];
                     break;
-                case 0x007:
+                case 7:
                     // and
                     if (MODE)
                         evm_print("and x[%d] = x[%d] & x[%d]\n", rd, rs1, rs2);
@@ -244,26 +255,9 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                         continue;
                     X[rd] = X[rs1] & X[rs2];
                     break;
-                case 0x105:
-                    // sra
-                    if (MODE)
-                        evm_print("slr x[%d] = x[%d] >>s x[%d]\n", rd, rs1, rs2);
-                    if (MODE == EVM_MODE_DISASM)
-                        continue;
-                    X[rd] = srs1 >> (X[rs2] & 0x1f);
-                    break;
-                case 0x100:
-                    // sub
-                    if (MODE)
-                        evm_print("sub x[%d] = x[%d] - x[%d]\n", rd, rs1, rs2);
-                    if (MODE == EVM_MODE_DISASM)
-                        continue;
-                    X[rd] = X[rs1] - X[rs2];
-                    break;
             }
         } else if (opcode == 0x37) {
             // lui
-            uint8_t rd = (*ptr >> 7) & 0xf;
             int32_t imm = *ptr & 0xffffff000;
             if (MODE)
                 evm_print("lui x[%d] = sext(%d)\n", rd, imm);
@@ -271,9 +265,8 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                 continue;
             X[rd] = imm;
         } else if (opcode == 0x63) {
-            uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
-            uint8_t rs2 = (*ptr >> 20) & 0xf;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
+            uint8_t rs2 = (*ptr >> 20) & 0x1f;
             uint32_t offset =
                 (((*ptr >> 25) & 0x3f) << 5)  |  // imm[10:5]
                 (((*ptr >>  8) & 0xf)  << 1)  |  // imm[4:1]
@@ -341,9 +334,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                     break;
             }
         } else if (opcode == 0x67) { // jalr
-            uint8_t rd = (*ptr >> 7) & 0xf;
-            // uint8_t func3 = (*ptr >> 12) & 0x7;
-            uint8_t rs1 = (*ptr >> 15) & 0xf;
+            uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t offset = (*ptr >> 20) & 0xfff;
             if (offset & 0x800)
                 offset |= 0xfffff000;
@@ -356,7 +347,6 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
             if (rd)
                 X[rd] = t;
         } else if (opcode == 0x6f) { // JAL
-            uint8_t rd = (*ptr >> 7) & 0xf;
             uint32_t offset =
                 (((*ptr >> 21) & 0x3ff)<< 1)  |  // imm[10:1]
                 (((*ptr >> 20) & 0x1)  << 11) |  // imm[11]
