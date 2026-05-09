@@ -76,10 +76,14 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
             switch (func3) {
                 case 0: // addi
                     if (MODE)
-                        evm_print("addi x[%d] = x[%d] (0x%08x) + sext(%d)\n", rd, rs1, X[rs1], (int32_t)imm);
-                    if (MODE == EVM_MODE_DISASM)
+                        evm_print("addi x[%d] = x[%d] (0x%08x) + sext(%d) //", rd, rs1, X[rs1], (int32_t)imm);
+                    if (MODE == EVM_MODE_DISASM) {
+                        evm_print("\n");
                         continue;
+                    }
                     X[rd] = X[rs1] + imm;
+                    if (MODE)
+                        evm_print( " %d + %d = %d\n", X[rd], X[rs1], imm);
                     break;
                 case 1: // slli
                     if (MODE)
@@ -111,18 +115,26 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                     X[rd] = X[rs1] ^ imm;
                     break;
                 case 5: // srli srai
-                    if (((imm >> 30) & 1) == 0) {
+                    if ((*ptr & 0x40000000) == 0) {
                         if (MODE)
-                            evm_print("srli x[%d] = x[%d] >> %d\n", rd, rs1, shamt);
-                        if (MODE == EVM_MODE_DISASM)
+                            evm_print("srli x[%d] = x[%d] >> %d //", rd, rs1, shamt);
+                        if (MODE == EVM_MODE_DISASM) {
+                            evm_print("\n");
                             continue;
+                        }
                         X[rd] = X[rs1] >> shamt;
+                        if (MODE)
+                            evm_print("%d >> %d = %d\n", srs1, shamt, X[rd]);
                     } else {
                         if (MODE)
-                            evm_print("srai x[%d] = x[%d] >>s %d\n", rd, rs1, shamt);
-                        if (MODE == EVM_MODE_DISASM)
+                            evm_print("srai x[%d] = x[%d] >>s %d //", rd, rs1, shamt);
+                        if (MODE == EVM_MODE_DISASM) {
+                            evm_print("\n");
                             continue;
+                        }
                         X[rd] = srs1 >> shamt;
+                        if (MODE)
+                            evm_print("%d >> %d = %d\n", srs1, shamt, X[rd]);
                     }
                     continue;
                 case 6: // ori
@@ -272,7 +284,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
                 (((*ptr >>  8) & 0xf)  << 1)  |  // imm[4:1]
                 (((*ptr >>  7) & 0x1)  << 11);   // imm[11]
             if (*ptr & 0x80000000)
-                offset |= 0xfffff800;
+                offset |= 0xfffff000;
             uint32_t urs1 = X[rs1];
             uint32_t urs2 = X[rs2];
             int32_t srs1 = X[rs1];
@@ -336,7 +348,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
         } else if (opcode == 0x67) { // jalr
             uint8_t rs1 = (*ptr >> 15) & 0x1f;
             uint32_t offset = (*ptr >> 20) & 0xfff;
-            if (offset & 0x800)
+            if (*ptr & 0x80000000)
                 offset |= 0xfffff000;
             if (MODE)
                 evm_print("jalr t=pc+4; pc=(x[%d]+sext(%d))&∼1; x[%d]=t\n", rs1, offset, rd);
