@@ -32,8 +32,6 @@ platform_ecall(uint16_t id, uint32_t *regs) {
     uint32_t a0 = regs[0];
     uint32_t a1 = regs[1];
     uint32_t a2 = regs[2];
-    uint32_t a3 = regs[3];
-    uint32_t a4 = regs[4];
     switch (id) {
         // dummy()
         case 1:
@@ -91,7 +89,6 @@ int main(int argc, char *argv[]) {
     }
 
     uint32_t array[] = {0, 3};
-    uint32_t arg = (uint32_t) array;
     uint8_t arg2[] = {0x00, 0x12, 0x34 };
     struct evm_args args = {
         .a0 = (uint32_t) array,
