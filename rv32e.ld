@@ -4,7 +4,8 @@ PHDRS {
 
 SECTIONS {
     . = 0xffffffff; /* MUST be non zero to trigger PIE */
-    .text : { *(.start) *(.text*) } :text
+    .start : { KEEP(*(.start)) } :text
+    .text : { *(.text*) } :text
     .data : { *(.data*) }
     .bss  : { *(.bss*)  }
     /DISCARD/ : {

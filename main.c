@@ -49,6 +49,9 @@ platform_ecall(uint16_t id, uint32_t *regs) {
         case 3:
             printf("print %d\n", a0);
             return;
+        case 255:
+            printf("%s\n", (char *) a0);
+            break;
         default:
             printf("unknown id\n");
             break;
