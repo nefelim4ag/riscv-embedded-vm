@@ -767,23 +767,26 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
     // Program counter
     uint8_t *PC = prog_start;
     while (PC < end) {
-        const uint32_t *ptr = (uint32_t *) PC;
+        const uint16_t *ptr = (uint16_t *) PC;
         const uint8_t prefix = *ptr & 0x3;
         if (prefix == 0x3) {
             const uint8_t opcode = (*ptr >> 2) & 0x1f; // 5 bit
+            uint32_t inst = *ptr;
+            uint16_t hi = *(uint16_t *)(PC + 2);
+            inst |= (uint32_t)hi << 16;
             if (MODE)
                 evm_print("%4x (x%02x.%x) | ", PC - prog_start, opcode, 3);
             switch (opcode) {
-                case 0x00: PC = lx(PC, X, *ptr, MODE); break;
-                case 0x04: PC = alu(PC, X, *ptr, MODE); break;
-                case 0x05: PC = auipc(PC, X, *ptr, MODE); break;
-                case 0x08: PC = sw(PC, X, *ptr, MODE); break;
-                case 0x0c: PC = sx(PC, X, *ptr, MODE); break;
-                case 0x0d: PC = lui(PC, X, *ptr, MODE); break;
-                case 0x18: PC = bxx(PC, X, *ptr, MODE); break;
-                case 0x19: PC = jalr(PC, X, *ptr, MODE); break;
-                case 0x1b: PC = jal(PC, X, *ptr, MODE); break;
-                case 0x1c: PC = ecall(PC, X, *ptr, MODE); break;
+                case 0x00: PC = lx(PC, X, inst, MODE); break;
+                case 0x04: PC = alu(PC, X, inst, MODE); break;
+                case 0x05: PC = auipc(PC, X, inst, MODE); break;
+                case 0x08: PC = sw(PC, X, inst, MODE); break;
+                case 0x0c: PC = sx(PC, X, inst, MODE); break;
+                case 0x0d: PC = lui(PC, X, inst, MODE); break;
+                case 0x18: PC = bxx(PC, X, inst, MODE); break;
+                case 0x19: PC = jalr(PC, X, inst, MODE); break;
+                case 0x1b: PC = jal(PC, X, inst, MODE); break;
+                case 0x1c: PC = ecall(PC, X, inst, MODE); break;
                 default:
                     if (MODE)
                         evm_print("opcode 0x%02x - not implemented\n",
