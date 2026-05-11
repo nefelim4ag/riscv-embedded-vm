@@ -554,47 +554,214 @@ __attribute__((noinline)) int test_jal(void) {
     return f;
 }
 
+#define _prints(string) (RISC_V_EVM_CALL_N1(255, string))
+
+static inline void
+prints(char *str) {
+    _prints(str);
+}
+
 __section(".start")
 int main(void) {
-    int total = 0;
+    int ret;
+    ret = test_addi();
+    if (ret) {
+        prints("failed addi");
+        return ret;
+    }
 
-    total += test_addi();
-    total += test_slti();
-    total += test_sltiu();
-    total += test_xori();
-    total += test_ori();
-    total += test_andi();
-    total += test_slli();
-    total += test_srli();
-    total += test_srai();
-    total += test_lui();
-    total += test_auipc();
+    ret = test_slti();
+    if (ret) {
+        prints("failed slti");
+        return ret;
+    }
 
-    total += test_add();
-    total += test_sub();
-    total += test_sll();
-    total += test_slt();
-    total += test_sltu();
-    total += test_xor();
-    total += test_srl();
-    total += test_sra();
-    total += test_or();
-    total += test_and();
+    ret = test_sltiu();
+    if (ret) {
+        prints("failed sltiu");
+        return ret;
+    }
 
-    total += test_sw_lw();
-    total += test_sb_lb();
-    total += test_sb_lbu();
-    total += test_sh_lh();
-    total += test_sh_lhu();
+    ret = test_xori();
+    if (ret) {
+        prints("failed xori");
+        return ret;
+    }
 
-    total += test_beq();
-    total += test_bne();
-    total += test_blt();
-    total += test_bge();
-    total += test_bltu();
-    total += test_bgeu();
+    ret = test_ori();
+    if (ret) {
+        prints("failed ori");
+        return ret;
+    }
 
-    total += test_jal();
+    ret = test_andi();
+    if (ret) {
+        prints("failed andi");
+        return ret;
+    }
+
+    ret = test_slli();
+    if (ret) {
+        prints("failed slli");
+        return ret;
+    }
+
+    ret = test_srli();
+    if (ret) {
+        prints("failed srli");
+        return ret;
+    }
+
+    ret = test_srai();
+    if (ret) {
+        prints("failed srai");
+        return ret;
+    }
+
+    ret = test_lui();
+    if (ret) {
+        prints("failed lui");
+        return ret;
+    }
+
+    ret = test_auipc();
+    if (ret) {
+        prints("failed auipc");
+        return ret;
+    }
+
+    ret = test_add();
+    if (ret) {
+        prints("failed add");
+        return ret;
+    }
+
+    ret = test_sub();
+    if (ret) {
+        prints("failed sub");
+        return ret;
+    }
+
+    ret = test_sll();
+    if (ret) {
+        prints("failed sll");
+        return ret;
+    }
+
+    ret = test_slt();
+    if (ret) {
+        prints("failed slt");
+        return ret;
+    }
+
+    ret = test_sltu();
+    if (ret) {
+        prints("failed sltu");
+        return ret;
+    }
+
+    ret = test_xor();
+    if (ret) {
+        prints("failed xor");
+        return ret;
+    }
+
+    ret = test_srl();
+    if (ret) {
+        prints("failed srl");
+        return ret;
+    }
+
+    ret = test_sra();
+    if (ret) {
+        prints("failed sra");
+        return ret;
+    }
+
+    ret = test_or();
+    if (ret) {
+        prints("failed or");
+        return ret;
+    }
+
+    ret = test_and();
+    if (ret) {
+        prints("failed and");
+        return ret;
+    }
+
+    ret = test_sw_lw();
+    if (ret) {
+        prints("failed lw");
+        return ret;
+    }
+
+    ret = test_sb_lb();
+    if (ret) {
+        prints("failed lb");
+        return ret;
+    }
+
+    ret = test_sb_lbu();
+    if (ret) {
+        prints("failed lbu");
+        return ret;
+    }
+
+    ret = test_sh_lh();
+    if (ret) {
+        prints("failed lh");
+        return ret;
+    }
+
+    ret = test_sh_lhu();
+    if (ret) {
+        prints("failed lhu");
+        return ret;
+    }
+
+    ret = test_beq();
+    if (ret) {
+        prints("failed beq");
+        return ret;
+    }
+
+    ret = test_bne();
+    if (ret) {
+        prints("failed bne");
+        return ret;
+    }
+
+    ret = test_blt();
+    if (ret) {
+        prints("failed blt");
+        return ret;
+    }
+
+    ret = test_bge();
+    if (ret) {
+        prints("failed bge");
+        return ret;
+    }
+
+    ret = test_bltu();
+    if (ret) {
+        prints("failed bltu");
+        return ret;
+    }
+
+    ret = test_bgeu();
+    if (ret) {
+        prints("failed bgeu");
+        return ret;
+    }
+
+    ret = test_jal();
+    if (ret) {
+        prints("failed jal");
+        return ret;
+    }
+
     // Return total failure count. 0 = all passed.
-    return total;
+    return 0;
 }
