@@ -75,6 +75,31 @@ __attribute__((noinline)) int test_c_addi16sp(void) {
     return f;
 }
 
+// C.ADDI16SP over the full range, incl. negative values with imm[8] == 0
+#define CHECK_SP(imm) do {                                    \
+    int32_t b, a;                                             \
+    asm volatile(                                             \
+        "mv  %0, sp                 \n\t"                     \
+        "c.addi16sp sp, " #imm "    \n\t"                     \
+        "mv  %1, sp                 \n\t"                     \
+        "mv  sp, %0                 \n\t"                     \
+        : "=&r"(b), "=&r"(a) : : "memory");                   \
+    f += ((a - b) != (imm));                                  \
+} while (0)
+
+__attribute__((noinline)) int test_c_addi16sp_range(void) {
+    int f = 0;
+    CHECK_SP(-512);
+    CHECK_SP(-496);
+    CHECK_SP(-272);
+    CHECK_SP(-256);
+    CHECK_SP(-16);
+    CHECK_SP(16);
+    CHECK_SP(256);
+    CHECK_SP(496);
+    return f;
+}
+
 // C.SRLI  rd', uimm6  - rd' = rd' >> uimm (logical)
 __attribute__((noinline)) int test_c_srli(void) {
     int f = 0;
@@ -350,6 +375,12 @@ int main(void) {
     ret = test_c_addi16sp();
     if (ret) {
         prints("failed test_c_addi16sp");
+        return ret;
+    }
+
+    ret = test_c_addi16sp_range();
+    if (ret) {
+        prints("failed test c.addi16sp range");
         return ret;
     }
 

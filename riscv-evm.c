@@ -513,7 +513,7 @@ c1(uint8_t *PC, uint32_t *X, uint16_t inst, uint8_t MODE) {
                 imm |= ((inst >> 3) & 0x1) << 7;
                 imm |= ((inst >> 2) & 0x1) << 5;
                 if (inst & 0x1000)
-                    imm |= 0xffffff00;
+                    imm |= 0xfffffe00;
                 if (MODE)
                     evm_print("c.addi16sp x[2] += sext(%d)\n",
                         (int32_t)imm);
