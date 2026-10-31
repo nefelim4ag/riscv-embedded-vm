@@ -50,7 +50,7 @@ platform_ecall(struct evm_ctx *ctx, uint16_t id, uint32_t *regs) {
             printf("print %d\n", a0);
             return;
         case 255:
-            char *ptr = (char *) evm_g2h(ctx, a2, 1);
+            char *ptr = (char *) evm_g2h(ctx, a0, 1);
             printf("%s\n", ptr);
             break;
         default:

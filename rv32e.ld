@@ -3,11 +3,13 @@ PHDRS {
 }
 
 SECTIONS {
-    . = 0xffffffff; /* MUST be non zero to trigger PIE */
-    .start : { KEEP(*(.start)) } :text
-    .text : { *(.text*) } :text
-    .data : { *(.data*) }
-    .bss  : { *(.bss*)  }
+    . = 0x0;
+    .start  : { KEEP(*(.start)) } :text
+    .text   : { *(.text*) . = ALIGN(4); _code_end = .; } :text
+    .rodata : ALIGN(4) { *(.rodata*) *(.srodata*) . = ALIGN(4); } :text
+    . = ALIGN(4);
+    .data : { *(.data*) *(.sdata*) }
+    .bss  : { *(.bss*) *(.sbss*) *(COMMON) }
     /DISCARD/ : {
         *(.eh_frame)
         *(.comment)

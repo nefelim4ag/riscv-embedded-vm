@@ -2,8 +2,8 @@ CC = gcc
 CFLAGS = -O2 -g -Wall
 
 CC_VM = riscv64-linux-gnu-gcc
-VM_CFLAGS = -O2 -march=rv32e -mabi=ilp32e -ffreestanding -nostdlib -fPIE
-VM_CFLAGS_COMP = -Os -march=rv32ec -mabi=ilp32e -ffreestanding -nostdlib -fPIE
+VM_CFLAGS = -O2 -march=rv32e -mabi=ilp32e -ffreestanding -nostdlib -fno-pic -mcmodel=medlow
+VM_CFLAGS_COMP = -Os -march=rv32ec -mabi=ilp32e -ffreestanding -nostdlib -fno-pic -mcmodel=medlow
 
 all: main.bin example.bin test_rv32e_base.bin test_rv32c.bin
 

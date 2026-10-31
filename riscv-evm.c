@@ -32,6 +32,8 @@ evm_g2h(const struct evm_ctx *ctx, uint16_t addr, uint_fast8_t len)
     offset = addr - ctx->win.base;
     if (offset < ctx->win.size && len <= ctx->win.size - offset)
         return ctx->win.mem + offset;
+    if (addr + len <= ctx->img_size)
+        return ctx->prog_start + addr;
     return NULL;
 }
 
