@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -O2 -g -m32 -Wall
+CFLAGS = -O2 -g -Wall
 
 CC_VM = riscv64-linux-gnu-gcc
 VM_CFLAGS = -O2 -march=rv32e -mabi=ilp32e -ffreestanding -nostdlib -fPIE

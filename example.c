@@ -29,9 +29,9 @@ __attribute__((noinline)) int sum(int a, int b) {
 }
 
 __section(".start")
-int task(uint32_t *args)
+int task(uint32_t *args, uint8_t *arg2)
 {
     args[0] -= args[1];
-    sendf(0, 0, (uint8_t *) *args);
+    sendf(0, 8, (uint8_t *)args);
     return sum(args[0], args[1]);
 }
