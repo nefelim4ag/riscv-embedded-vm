@@ -347,7 +347,7 @@ static uint8_t *
 auipc(uint8_t *PC, uint32_t *X, uint32_t inst, uint8_t MODE)
 {
     uint8_t rd = (inst >> 7) & 0x1f;
-    int32_t imm = inst & 0xffffff000;
+    int32_t imm = inst & 0xfffff000;
     // AUIPC
     if (MODE)
         evm_print("auipc x[%d] = pc + sext(%d)\n", rd, imm);
@@ -363,7 +363,7 @@ lui(uint8_t *PC, uint32_t *X, uint32_t inst, uint8_t MODE)
 {
     // LUI
     uint8_t rd = (inst >> 7) & 0x1f;
-    int32_t imm = inst & 0xffffff000;
+    int32_t imm = inst & 0xfffff000;
     if (MODE)
         evm_print("lui x[%d] = sext(0x%x)\n", rd, imm);
     if (MODE == EVM_MODE_DISASM)
@@ -459,7 +459,7 @@ c0(uint8_t *PC, uint32_t *X, uint16_t inst, uint8_t MODE) {
                 break;
             uint32_t val = 0;
             for (int i = 0; i < 4; i++)
-                val |= mem[i] << (i * 8);
+                val |= (uint32_t)mem[i] << (i * 8);
             X[rd] = val;
             break;
         case 6: // c.sw
@@ -678,7 +678,7 @@ c2(uint8_t *PC, uint32_t *X, uint16_t inst, uint8_t MODE) {
             mem = (uint8_t *) (X[2] + imm);
             uint32_t val = 0;
             for (int i = 0; i < 4; i++)
-                val |= mem[i] << (i * 8);
+                val |= (uint32_t)mem[i] << (i * 8);
             X[rd] = val;
             break;
         case 4:
