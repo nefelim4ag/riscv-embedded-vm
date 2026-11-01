@@ -97,28 +97,25 @@ int main(int argc, char *argv[]) {
         uint8_t  arg2[4];
     };
 
-    struct shared shared = {
-        .array = {0, 3},
-        .arg2 = {0x00, 0x12, 0x34}
-    };
+    uint32_t array[] = {0, 3};
+    uint8_t arg2[] = {0x00, 0x12, 0x34};
 
     uint8_t *end = base + size;
-    struct evm_mmap win;
+    struct evm_ctx ctx;
 
-    if (evm_window_init(&win, base, end, &shared, sizeof(shared)) == EVM_ENOMEM) {
-        printf("Too large mmap\n");
-    }
+    evm_setup_prog(&ctx, base, end);
+    evm_map_memory(&ctx, (uint8_t *) array, sizeof(array));
+    evm_map_memory(&ctx, (uint8_t *) arg2, sizeof(arg2));
 
-    struct evm_args args = {
-        .a0 = evm_h2g(&win, shared.array),
-        .a1 = evm_h2g(&win, shared.arg2),
-    };
+    ctx.X[10] = evm_h2g(&ctx, array);
+    ctx.X[11] = evm_h2g(&ctx, arg2);
 
-    int ret = evm_interpreter(base, end, 0, EVM_MODE_INT_DEBUG, &args, &win);
+    int ret = evm_interpreter(&ctx, 0, EVM_MODE_INT_DEBUG);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }
-    printf("Execution result: %d\n", args.a0);
+    // A0
+    printf("Execution result: %d\n", ctx.X[10]);
 
     munmap(base, size);
     return 0;

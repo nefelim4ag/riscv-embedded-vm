@@ -17,27 +17,32 @@ void evm_print(const char *fmt, ...);
 struct evm_ctx;
 
 struct evm_mmap {
-    uint8_t *mem;  // host address of the shared struct
-    uint16_t base; // guest address of mem[0]
-    uint16_t size;
+    uint8_t *host_base;  // host address of shared thing
+    uint16_t guest_base; // guest address of the same memory
+    uint16_t size;       // size of memory region
 };
 
-// EVM_ENOMEM if the image leaves no room below the stack
-int evm_window_init(struct evm_mmap *w, uint8_t *prog_start, uint8_t *prog_end,
-                    void *mem, uint16_t size);
+#define EVM_MMAP_MAX 8
+#define EVM_STACK_PAGE 0
+#define EVM_PROG_PAGE 1
+
+struct evm_ctx {
+    struct evm_mmap pages[EVM_MMAP_MAX];
+    int8_t page_cnt;
+    int8_t fault;
+    uint32_t X[16];
+};
+
+int evm_setup_prog(struct evm_ctx *ctx, uint8_t *start, uint8_t *end);
+int evm_map_memory(struct evm_ctx *ctx, uint8_t *ptr, uint16_t size);
 
 // host -> guest: any pointer inside the struct (or the struct itself).
-uint16_t evm_h2g(const struct evm_mmap *w, const void *host_ptr);
+uint16_t evm_h2g(const struct evm_ctx *ctx, const void *host_ptr);
 
 // guest -> host, for platform_ecall (window or stack). NULL on failure.
 uint8_t *evm_g2h(const struct evm_ctx *ctx, uint16_t addr, uint_fast8_t len);
 
-struct evm_args {
-    uint32_t a0, a1, a2, a3, a4;
-};
-
-int evm_interpreter(uint8_t *prog_start, uint8_t *end, uint16_t entry_offset,
-    uint8_t mode, struct evm_args *args, struct evm_mmap *w);
+int evm_interpreter(struct evm_ctx *ctx, uint16_t entry_offset, uint8_t mode);
 
 // Platform helpers
 void

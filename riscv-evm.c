@@ -10,78 +10,81 @@
 
 // Memory isolation
 #define EVM_PROG_BASE 0xFEFF8000
-#define EVM_STACK_TOP 0x8000u
+#define EVM_STACK_TOP 0x4000u
 #define EVM_STACK_SIZE 192u
 #define EVM_STACK_LOW (EVM_STACK_TOP - EVM_STACK_SIZE)
-
-struct evm_ctx {
-    uint8_t *prog_start;
-    uint16_t img_size;
-    uint8_t *stack;
-    struct evm_mmap win;
-    uint32_t X[16];
-    int fault;
-};
 
 uint8_t *
 evm_g2h(const struct evm_ctx *ctx, uint16_t addr, uint_fast8_t len)
 {
-    uint16_t offset = addr - EVM_STACK_LOW;
-    if (offset < EVM_STACK_SIZE && len <= EVM_STACK_SIZE - offset)
-        return ctx->stack + offset;
-    offset = addr - ctx->win.base;
-    if (offset < ctx->win.size && len <= ctx->win.size - offset)
-        return ctx->win.mem + offset;
-    if (addr + len <= ctx->img_size)
-        return ctx->prog_start + addr;
+    for (int i = 0; i < EVM_MMAP_MAX; i++) {
+        uint16_t guest_base = ctx->pages[i].guest_base;
+        uint16_t offset = addr - guest_base;
+        uint16_t size = ctx->pages[i].size;
+        if (offset < size && len <= size - offset) {
+            return ctx->pages[i].host_base + offset;
+        }
+    }
     return NULL;
+}
+
+uint16_t
+evm_h2g(const struct evm_ctx *ctx, const void *p)
+{
+    for (int i = 0; i < ctx->page_cnt; i++) {
+        uint8_t *host_base = ctx->pages[i].host_base;
+        uintptr_t offset = (uintptr_t)p - (uintptr_t)host_base;
+        uint16_t size = ctx->pages[i].size;
+        if (offset < size) {
+            return ctx->pages[i].guest_base + offset;
+        }
+    }
+    return 0;
 }
 
 static uint32_t
 pc2g(const struct evm_ctx *ctx, const uint8_t *PC)
 {
-    return (uint32_t)(PC - ctx->prog_start);
+    return (uint32_t)(PC - ctx->pages[EVM_PROG_PAGE].host_base);
 }
 
 static uint8_t
 *g2pc(struct evm_ctx *ctx, uint32_t target)
 {
+    struct evm_mmap *prog_page = &ctx->pages[EVM_PROG_PAGE];
     // == img_size is the "return to host" exit
-    if (target > ctx->img_size) {
+    if (target > prog_page->size) {
         ctx->fault = 1;
-        return ctx->prog_start + ctx->img_size;
+        return prog_page->host_base + prog_page->size;
     }
-    return ctx->prog_start + target;
+    return prog_page->host_base + target;
 }
 
-int
-evm_window_init(struct evm_mmap *w, uint8_t *prog_start, uint8_t *prog_end,
-                void *mem, uint16_t size)
+int evm_setup_prog(struct evm_ctx *ctx, uint8_t *start, uint8_t *end)
 {
-    uint32_t img_size = prog_end - prog_start;
-    uint32_t base = (img_size + 3u) & ~3u;
-    if (base >= EVM_STACK_LOW)
-        return EVM_ENOMEM;
-    uint32_t room = EVM_STACK_LOW - base;
-    w->mem  = mem;
-    w->base = base;
-    w->size = size;
-    if (size > room)
-        return EVM_ENOMEM;
+    ctx->pages[EVM_PROG_PAGE].guest_base = 0;
+    ctx->pages[EVM_PROG_PAGE].host_base = start;
+    ctx->pages[EVM_PROG_PAGE].size = (uintptr_t)end - (uintptr_t)start;
+    ctx->page_cnt = EVM_PROG_PAGE + 1;
     return 0;
 }
 
-uint16_t
-evm_h2g(const struct evm_mmap *w, const void *p)
+int evm_map_memory(struct evm_ctx *ctx, uint8_t *ptr, uint16_t size)
 {
-    uintptr_t off = (uintptr_t)p - (uintptr_t)w->mem;
-    if (off >= w->size)
+    if (ctx->page_cnt < EVM_MMAP_MAX) {
+        struct evm_mmap *cpage = &ctx->pages[ctx->page_cnt];
+        struct evm_mmap *prev_page = &ctx->pages[ctx->page_cnt - 1];
+        cpage->host_base = ptr;
+        cpage->guest_base = (prev_page->guest_base + prev_page->size + 3u) & ~3u;
+        cpage->size = size;
+        ctx->page_cnt += 1;
         return 0;
-    return w->base + off;
+    }
+    return -1;
 }
 
 static void
-lx(struct evm_ctx *ctx, uint32_t *X, uint32_t inst, uint8_t MODE)
+lx(struct evm_ctx *ctx, uint32_t inst, uint8_t MODE)
 {
     uint8_t rd = (inst >> 7) & 0x1f;
     uint8_t func3 = (inst >> 12) & 0x7;
@@ -89,6 +92,7 @@ lx(struct evm_ctx *ctx, uint32_t *X, uint32_t inst, uint8_t MODE)
     uint32_t offset = (inst >> 20) & 0xfff;
     if (inst & 0x80000000)
         offset |= 0xfffff000;
+    uint32_t *X = ctx->X;
     uint_fast16_t addr = X[rs1] + offset;
     uint8_t width = 1 << (func3 & 0x3); // 1, 2, 4 bytes
     uint8_t is_signed = !(func3 & 0x4);
@@ -391,9 +395,9 @@ out:
 }
 
 static void
-sw(struct evm_ctx *ctx, uint32_t *X, uint32_t inst,
-    uint8_t MODE)
+sw(struct evm_ctx *ctx, uint32_t inst, uint8_t MODE)
 {
+    uint32_t *X = ctx->X;
     uint8_t func3 = (inst >> 12) & 0x7;
     uint8_t rs1 = (inst >> 15) & 0x1f;
     uint8_t rs2 = (inst >> 20) & 0x1f;
@@ -509,9 +513,10 @@ ecall(struct evm_ctx *ctx, uint32_t inst, uint8_t MODE)
 }
 
 static void
-c0(struct evm_ctx *ctx, uint32_t *X, uint16_t inst, uint8_t MODE)
+c0(struct evm_ctx *ctx, uint16_t inst, uint8_t MODE)
 {
     const uint8_t opcode = inst >> 13;
+    uint32_t *X = ctx->X;
     uint8_t rd = ((inst >> 2) & 0x7) + 8;
     uint8_t rs1 = ((inst >> 7) & 0x7) + 8;
     uint32_t imm = ((inst >> 6) & 0x1) << 2 |
@@ -754,7 +759,7 @@ c2(struct evm_ctx *ctx, uint8_t *PC, uint32_t *X, uint16_t inst,
         case 0: // c.slli
             uint8_t shamt = (inst >> 2) & 0x1f;
             if (MODE)
-                evm_print("c.slli x[%d] = x[%d] << %d\n", rd, shamt);
+                evm_print("c.slli x[%d] = x[%d] << %d\n", rd, rd, shamt);
             if (MODE == EVM_MODE_DISASM)
                 break;
             X[rd] = X[rd] << shamt;
@@ -848,32 +853,30 @@ c2(struct evm_ctx *ctx, uint8_t *PC, uint32_t *X, uint16_t inst,
 }
 
 int
-evm_interpreter(uint8_t *prog_start, uint8_t *end, uint16_t entry_offset,
-                uint8_t mode, struct evm_args *args, struct evm_mmap *win)
+evm_interpreter(struct evm_ctx *ctx, uint16_t start_offset, uint8_t mode)
 {
     const uint8_t MODE = mode;
     if (MODE == EVM_MODE_DISASM)
         evm_print("Run disassembler\n");
     if (MODE == EVM_MODE_INT_DEBUG)
         evm_print("Run interpreter debug mode\n");
-    uint8_t stack[EVM_STACK_SIZE];
-    struct evm_ctx ctx = {
-        .stack = stack,
-        .prog_start = prog_start,
-        .img_size = end - prog_start,
-        .fault = 0
-    };
-    ctx.win = *win;
-    ctx.X[0] = 0; // always
-    ctx.X[1] = ctx.img_size;   // dummy return point
-    ctx.X[2] = EVM_STACK_TOP;  // stack pointer
-    ctx.X[10] = args->a0;
-    ctx.X[11] = args->a1;
-    ctx.X[12] = args->a2;
-    ctx.X[13] = args->a3;
-    ctx.X[14] = args->a4;
-    // Program counter
-    uint8_t *PC = prog_start + entry_offset;
+    uint8_t stack[192];
+    ctx->fault = 0;
+    // Stack mmap
+    struct evm_mmap *stack_page = &ctx->pages[EVM_STACK_PAGE];
+    stack_page->host_base = stack;
+    stack_page->guest_base = EVM_STACK_LOW;
+    stack_page->size = EVM_STACK_SIZE;
+    ctx->X[0] = 0; // always
+    // dummy return point
+    ctx->X[1] = ctx->pages[1].guest_base + ctx->pages[1].size;
+    // stack pointer
+    ctx->X[2] = ctx->pages[0].guest_base + ctx->pages[0].size;
+    // Program counter/PROG
+    struct evm_mmap *prog_page = &ctx->pages[EVM_PROG_PAGE];
+    uint8_t *PC = prog_page->host_base + start_offset;
+    uint8_t *prog_start = prog_page->host_base;
+    uint8_t *end = prog_page->host_base + prog_page->size;
     while (PC < end) {
         const uint16_t *ptr = (uint16_t *) PC;
         const uint8_t prefix = *ptr & 0x3;
@@ -885,16 +888,16 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end, uint16_t entry_offset,
             if (MODE)
                 evm_print("%4x (x%02x.%x) | ", PC - prog_start, opcode, 3);
             switch (opcode) {
-                case 0x00: lx(&ctx, ctx.X, inst, MODE); PC += 4; break;
-                case 0x04: alu(ctx.X, inst, MODE);      PC += 4; break;
-                case 0x05: PC = auipc(&ctx, PC, inst, MODE); break;
-                case 0x08: sw(&ctx, ctx.X, inst, MODE); PC += 4; break;
-                case 0x0c: sx(ctx.X, inst, MODE); PC += 4; break;
-                case 0x0d: PC = lui(PC, ctx.X, inst, MODE); break;
-                case 0x18: PC = bxx(&ctx, PC, inst, MODE); break;
-                case 0x19: PC = jalr(&ctx, PC, inst, MODE); break;
-                case 0x1b: PC = jal(&ctx, PC, inst, MODE); break;
-                case 0x1c: ecall(&ctx, inst, MODE); PC += 4; break;
+                case 0x00: lx(ctx, inst, MODE); PC += 4; break;
+                case 0x04: alu(ctx->X, inst, MODE);      PC += 4; break;
+                case 0x05: PC = auipc(ctx, PC, inst, MODE); break;
+                case 0x08: sw(ctx, inst, MODE); PC += 4; break;
+                case 0x0c: sx(ctx->X, inst, MODE); PC += 4; break;
+                case 0x0d: PC = lui(PC, ctx->X, inst, MODE); break;
+                case 0x18: PC = bxx(ctx, PC, inst, MODE); break;
+                case 0x19: PC = jalr(ctx, PC, inst, MODE); break;
+                case 0x1b: PC = jal(ctx, PC, inst, MODE); break;
+                case 0x1c: ecall(ctx, inst, MODE); PC += 4; break;
                 default:
                     if (MODE)
                         evm_print("opcode 0x%02x - not implemented\n",
@@ -908,18 +911,13 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end, uint16_t entry_offset,
                 evm_print("%4x (x%02x.%x) | ", PC - prog_start, opcode,
                     prefix);
             switch (prefix) {
-                case 0: c0(&ctx, ctx.X, *ptr, MODE); PC += 2; break;
-                case 1: PC = c1(&ctx, PC, ctx.X, *ptr, MODE); break;
-                case 2: PC = c2(&ctx, PC, ctx.X, *ptr, MODE); break;
+                case 0: c0(ctx, *ptr, MODE); PC += 2; break;
+                case 1: PC = c1(ctx, PC, ctx->X, *ptr, MODE); break;
+                case 2: PC = c2(ctx, PC, ctx->X, *ptr, MODE); break;
             }
         }
-        if (ctx.fault)
+        if (ctx->fault)
             return EMV_MEMORY_FAULT;
     }
-    args->a0 = ctx.X[10];
-    args->a1 = ctx.X[11];
-    args->a2 = ctx.X[12];
-    args->a3 = ctx.X[13];
-    args->a4 = ctx.X[14];
     return 0;
 }

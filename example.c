@@ -14,6 +14,10 @@
 
 #define _sendf(oid, rlen, rdata) (RISC_V_EVM_CALL_N3(2, oid, rlen, rdata))
 
+static struct {
+    uint32_t a;
+} test;
+
 static inline void
 sendf(uint8_t oid, uint8_t rlen, uint8_t *rdata) {
     _sendf(oid, rlen, rdata);
@@ -32,6 +36,8 @@ __section(".start")
 int task(uint32_t *args, uint8_t *arg2)
 {
     args[0] -= args[1];
+    test.a = 2;
+    args[1] += test.a;
     sendf(0, 8, (uint8_t *)args);
     return sum(args[0], args[1]);
 }
