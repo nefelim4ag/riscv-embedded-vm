@@ -114,7 +114,7 @@ int main(int argc, char *argv[]) {
         .a1 = evm_h2g(&win, shared.arg2),
     };
 
-    int ret = evm_interpreter(base, end, EVM_MODE_INT_DEBUG, &args, &win);
+    int ret = evm_interpreter(base, end, 0, EVM_MODE_INT_DEBUG, &args, &win);
     if (ret < 0) {
         printf("evm_interpreter failed\n");
     }

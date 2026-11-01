@@ -848,7 +848,7 @@ c2(struct evm_ctx *ctx, uint8_t *PC, uint32_t *X, uint16_t inst,
 }
 
 int
-evm_interpreter(uint8_t *prog_start, uint8_t *end,
+evm_interpreter(uint8_t *prog_start, uint8_t *end, uint16_t entry_offset,
                 uint8_t mode, struct evm_args *args, struct evm_mmap *win)
 {
     const uint8_t MODE = mode;
@@ -873,7 +873,7 @@ evm_interpreter(uint8_t *prog_start, uint8_t *end,
     ctx.X[13] = args->a3;
     ctx.X[14] = args->a4;
     // Program counter
-    uint8_t *PC = prog_start;
+    uint8_t *PC = prog_start + entry_offset;
     while (PC < end) {
         const uint16_t *ptr = (uint16_t *) PC;
         const uint8_t prefix = *ptr & 0x3;
